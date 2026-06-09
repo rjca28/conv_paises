@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FPN · Conversor de Rankings → Código de País</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  :root{
+    --navy:#0b2a4a; --navy2:#103a63; --blue:#2f80c4; --ice:#eaf3fb;
+    --gold:#c9a24b; --gold-soft:#f0e3c4;
+    --ink:#10202f; --mut:#5d7186; --line:#d8e3ef; --bg:#f4f8fc;
+    --ok:#1f9d6b; --okbg:#e7f6ef; --warn:#c25b1c; --warnbg:#fbece0; --bad:#c0392b; --badbg:#fbe7e4;
+    --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;line-height:1.5}
+  .wrap{max-width:960px;margin:0 auto;padding:0 22px}
+
+  /* ---- cabeçalho com motivo de ondas/profundidade ---- */
+  header{position:relative;background:linear-gradient(160deg,var(--navy) 0%,var(--navy2) 100%);color:#fff;overflow:hidden}
+  header .wrap{position:relative;z-index:2;padding:34px 22px 64px}
+  .eyebrow{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold-soft);font-weight:600}
+  h1{margin:6px 0 8px;font-size:30px;font-weight:700;letter-spacing:-.01em}
+  header p{margin:0;max-width:62ch;color:#cbdcec;font-size:15px}
+  .waves{position:absolute;left:0;right:0;bottom:-1px;z-index:1;display:block;width:100%;height:46px}
+
+  main{padding:28px 0 70px}
+  .step{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 22px 24px;margin:0 0 20px;
+    box-shadow:0 1px 0 rgba(11,42,74,.03)}
+  .stephead{display:flex;align-items:baseline;gap:12px;margin:0 0 14px}
+  .num{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;
+    font-size:13px;font-weight:700;display:grid;place-items:center}
+  .stephead h2{margin:0;font-size:17px;font-weight:700}
+  .stephead .hint{color:var(--mut);font-size:13px;margin-left:auto}
+
+  label.fld{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);font-weight:600;margin:0 0 5px}
+  .row{display:flex;gap:16px;flex-wrap:wrap}
+  .col{flex:1 1 200px;min-width:160px}
+  input[type=text]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;font-size:15px;background:#fff;color:var(--ink)}
+  input#code{font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+  input:focus,select:focus,button:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+
+  /* ---- zona de largar ---- */
+  .drop{margin-top:4px;border:2px dashed #b9cee2;border-radius:12px;background:var(--ice);
+    padding:28px 18px;text-align:center;color:var(--mut);cursor:pointer;transition:.15s}
+  .drop:hover,.drop.over{border-color:var(--blue);background:#e1eefb;color:var(--navy)}
+  .drop strong{color:var(--navy)}
+  .drop .big{font-size:15px;margin:0 0 4px;color:var(--ink)}
+  .drop input{display:none}
+
+  table.files{width:100%;border-collapse:collapse;margin-top:16px;font-size:14px}
+  table.files th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+  table.files td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+  td.fname{font-size:13px;color:var(--ink);max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  select{padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:13px;background:#fff}
+  .rm{border:none;background:none;color:var(--mut);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px;border-radius:6px}
+  .rm:hover{background:var(--badbg);color:var(--bad)}
+
+  button.go{margin-top:18px;background:var(--navy);color:#fff;border:none;border-radius:10px;
+    padding:12px 22px;font-size:15px;font-weight:600;cursor:pointer;transition:.15s}
+  button.go:hover{background:var(--navy2)}
+  button.go:disabled{background:#9fb2c5;cursor:not-allowed}
+
+  /* ---- verificação ---- */
+  .gridhead{font-size:13px;font-weight:700;color:var(--navy);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+  .chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--ice);color:var(--navy)}
+  table.val{width:100%;border-collapse:collapse;font-size:13px}
+  table.val th{text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);font-weight:600;padding:5px 8px;border-bottom:1px solid var(--line)}
+  table.val td{padding:5px 8px;border-bottom:1px solid #eef3f8}
+  td.ev{font-weight:600;color:var(--ink);white-space:nowrap}
+  td.n{font-family:var(--mono);text-align:center;width:48px}
+  td.times{font-family:var(--mono);color:var(--mut);font-size:12px}
+  tr.warn td.n{color:var(--warn);font-weight:700}
+  tr.bad td.n{color:var(--bad);font-weight:700}
+  tr.bad td.ev,tr.bad td.times{color:var(--bad)}
+
+  /* ---- saída ---- */
+  .outbar{display:flex;gap:10px;align-items:center;margin-bottom:10px}
+  .outbar h2{margin:0;font-size:17px;font-weight:700}
+  .spacer{flex:1}
+  button.act{background:#fff;border:1px solid var(--line);color:var(--navy);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  button.act:hover{border-color:var(--blue);background:var(--ice)}
+  button.act.primary{background:var(--gold);border-color:var(--gold);color:#3a2e0f}
+  button.act.primary:hover{filter:brightness(1.05)}
+  textarea{width:100%;min-height:280px;border:1px solid var(--line);border-radius:11px;padding:14px;
+    font-family:var(--mono);font-size:12.5px;line-height:1.55;color:#0d2236;background:#fbfdff;resize:vertical}
+
+  .note{font-size:13px;color:var(--mut);background:var(--ice);border-left:3px solid var(--gold);
+    padding:12px 14px;border-radius:0 8px 8px 0;margin-top:6px}
+  .msg{font-size:13.5px;padding:11px 14px;border-radius:9px;margin-top:14px;display:none}
+  .msg.show{display:block}
+  .msg.err{background:var(--badbg);color:var(--bad)}
+  .msg.info{background:var(--okbg);color:var(--ok)}
+  .empty{color:var(--mut);font-size:14px;text-align:center;padding:24px 0}
+  footer{color:var(--mut);font-size:12.5px;text-align:center;padding:24px 22px 40px;border-top:1px solid var(--line)}
+  footer b{color:var(--navy)}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="eyebrow">Federação Portuguesa de Natação · Alto Rendimento</div>
+    <h1>Conversor de Rankings → Código de País</h1>
+    <p>Largue os quatro PDF "Melhores 100" do swimrankings (Masculino e Feminino, 2025 e 2026) e obtenha o bloco de código do país, pronto a colar na base de comparação. Tudo corre no seu navegador — nenhum ficheiro sai do computador.</p>
+  </div>
+  <svg class="waves" viewBox="0 0 1200 46" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0,24 C150,46 350,2 600,22 C850,42 1050,6 1200,24 L1200,46 L0,46 Z" fill="#f4f8fc"></path>
+    <path d="M0,30 C200,12 420,44 600,30 C800,15 1000,44 1200,28 L1200,46 L0,46 Z" fill="#f4f8fc" opacity=".55"></path>
+  </svg>
+</header>
+
+<main><div class="wrap">
+
+  <section class="step">
+    <div class="stephead"><span class="num">1</span><h2>Identificar o país</h2>
+      <span class="hint">a etiqueta é preenchida sozinha ao ler os PDF</span></div>
+    <div class="row">
+      <div class="col" style="flex:0 0 160px">
+        <label class="fld" for="code">Código (3 letras)</label>
+        <input type="text" id="code" maxlength="3" placeholder="POR" autocomplete="off">
+      </div>
+      <div class="col">
+        <label class="fld" for="label">Etiqueta</label>
+        <input type="text" id="label" placeholder="Portugal" autocomplete="off">
+      </div>
+    </div>
+  </section>
+
+  <section class="step">
+    <div class="stephead"><span class="num">2</span><h2>Carregar os PDF</h2>
+      <span class="hint">género e época são detetados automaticamente</span></div>
+    <div class="drop" id="drop">
+      <p class="big"><strong>Largue aqui os PDF</strong> ou clique para escolher</p>
+      <p style="margin:0;font-size:13px">Idealmente os 4: Masc. 2025, Masc. 2026, Femin. 2025, Femin. 2026</p>
+      <input type="file" id="file" accept="application/pdf" multiple>
+    </div>
+    <div id="filewrap"></div>
+    <button class="go" id="run" disabled>Gerar código do país</button>
+    <div class="msg" id="msg"></div>
+  </section>
+
+  <section class="step" id="verify" style="display:none">
+    <div class="stephead"><span class="num">3</span><h2>Verificação</h2>
+      <span class="hint">confirme as marcas antes de copiar</span></div>
+    <div id="grids"></div>
+  </section>
+
+  <section class="step" id="outstep" style="display:none">
+    <div class="outbar">
+      <h2>Código do país</h2>
+      <div class="spacer"></div>
+      <button class="act" id="copy">Copiar</button>
+      <button class="act primary" id="download">Descarregar .json</button>
+    </div>
+    <textarea id="out" readonly spellcheck="false"></textarea>
+    <div class="note">Cole este bloco ao lado dos restantes países na base de comparação (separador <b>Carregar países</b>) ou no respetivo array de países. Cada prova traz as 6 melhores marcas, em segundos — o suficiente para as médias dos 2, 3 e 4 melhores.</div>
+  </section>
+
+  <p class="empty" id="placeholder" style="display:none"></p>
+
+</div></main>
+
+<footer>
+  <b>Federação Portuguesa de Natação</b> — ferramenta de trabalho.<br>
+  Lê os rankings nacionais "Melhores 100" (swimrankings, piscina longa), na mesma base por clube/inscrição usada para os outros países.<br>
+  As 17 provas individuais do programa LA28 · estafetas, 5000 m e parciais (Lap) são ignorados.
+</footer>
+
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ---------- mapeamento de provas (chave PT do PDF -> chave do modelo) ---------- */
+const EVENTS = {
+ '50m Livres':'50 Free','100m Livres':'100 Free','200m Livres':'200 Free','400m Livres':'400 Free',
+ '800m Livres':'800 Free','1500m Livres':'1500 Free',
+ '50m Costas':'50 Back','100m Costas':'100 Back','200m Costas':'200 Back',
+ '50m Bruços':'50 Breast','100m Bruços':'100 Breast','200m Bruços':'200 Breast',
+ '50m Mariposa':'50 Fly','100m Mariposa':'100 Fly','200m Mariposa':'200 Fly',
+ '200m Estilos':'200 IM','400m Estilos':'400 IM'
+};
+/* ordem idêntica ao bloco de referência (1500 Free a seguir aos 200 Back) */
+const ORDER = ['50 Free','100 Free','200 Free','400 Free','800 Free',
+ '50 Back','100 Back','200 Back','1500 Free',
+ '50 Breast','100 Breast','200 Breast',
+ '50 Fly','100 Fly','200 Fly','200 IM','400 IM'];
+const STROKE = {livres:'Livres',costas:'Costas',brucos:'Bruços',mariposa:'Mariposa',estilos:'Estilos'};
+const TIME_RE = /^(?:(\d+):)?(\d{1,2})\.(\d{2})$/;
+const CODES = {'portugal':'POR','países baixos':'NED','paises baixos':'NED','espanha':'ESP',
+ 'frança':'FRA','franca':'FRA','itália':'ITA','italia':'ITA','alemanha':'GER','grã-bretanha':'GBR',
+ 'reino unido':'GBR','hungria':'HUN','suécia':'SWE','suecia':'SWE','dinamarca':'DEN','polónia':'POL',
+ 'polonia':'POL','bélgica':'BEL','belgica':'BEL','suíça':'SUI','suica':'SUI','noruega':'NOR'};
+
+function deAccent(s){return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');}
+function toSec(t){const m=TIME_RE.exec(t);if(!m)return null;return (m[1]?+m[1]:0)*60+(+m[2])+(+m[3])/100;}
+function fmt(s){if(s==null)return'—';const m=Math.floor(s/60),r=s-60*m;return m?`${m}:${r.toFixed(2).padStart(5,'0')}`:r.toFixed(2);}
+function mean(arr,n){const a=arr.slice(0,n);return a.length?+(a.reduce((x,y)=>x+y,0)/a.length).toFixed(2):null;}
+
+/* ---------- núcleo: extrair um PDF ---------- */
+async function parsePdf(buf){
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  const data = {};                 // event -> [seconds...] em ordem de ranking
+  const meta = {label:null, gender:null, year:null};
+
+  for(let p=1;p<=pdf.numPages;p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    // tokens ao nível da palavra, com x estimado
+    const toks=[];
+    for(const it of tc.items){
+      const s=it.str; if(!s||!s.trim())continue;
+      const x0=it.transform[4], y=it.transform[5], w=it.width||0;
+      const parts=s.split(/\s+/).filter(Boolean);
+      if(parts.length===1){toks.push({t:parts[0],x:x0,y});}
+      else{
+        let from=0;
+        for(const part of parts){
+          const idx=s.indexOf(part,from);
+          toks.push({t:part, x:x0+(idx/Math.max(s.length,1))*w, y});
+          from=idx+part.length;
+        }
+      }
+    }
+
+    if(p===1){
+      const head=toks.slice(0,46).map(t=>t.t).join(' ');
+      const pi=toks.findIndex(t=>t.t==='Piscina');
+      if(pi>0) meta.label=toks.slice(0,pi).map(t=>t.t).join(' ').replace(/\s+/g,' ').trim();
+      if(/\bMasc\b/i.test(head)) meta.gender='M'; else if(/\bFemin\b/i.test(head)) meta.gender='F';
+      const ym=head.match(/(20\d\d)/); if(ym) meta.year=ym[1];
+    }
+
+    // agrupar por linha (y) para descobrir os cabeçalhos de coluna
+    const lineMap=new Map();
+    for(const tk of toks){const k=Math.round(tk.y);(lineMap.get(k)||lineMap.set(k,[]).get(k)).push(tk);}
+    const ys=[...lineMap.keys()].sort((a,b)=>b-a);   // y decrescente = de cima para baixo
+    let headerX=null;
+    for(const y of ys){
+      const row=[...lineMap.get(y)].sort((a,b)=>a.x-b.x);
+      const xs=[];
+      for(let i=0;i<row.length-1;i++){
+        if(/^\d+m$/.test(row[i].t) && Object.values(STROKE).includes(row[i+1].t)) xs.push(row[i].x);
+      }
+      if(xs.length>=2){headerX=xs.sort((a,b)=>a-b);break;}
+    }
+    if(!headerX) continue;
+
+    const bounds=headerX.map((hx,i)=>[hx-15, i+1<headerX.length?headerX[i+1]-15:1e9]);
+    const colOf=x=>{for(let i=0;i<bounds.length;i++) if(x>=bounds[i][0]&&x<bounds[i][1]) return i; return bounds.length-1;};
+
+    const colTok=bounds.map(()=>[]);
+    for(const tk of toks) colTok[colOf(tk.x)].push(tk);
+
+    for(let ci=0;ci<bounds.length;ci++){
+      const rmap=new Map();
+      for(const tk of colTok[ci]){const k=Math.round(tk.y);(rmap.get(k)||rmap.set(k,[]).get(k)).push(tk);}
+      const rys=[...rmap.keys()].sort((a,b)=>b-a);
+      let cur=null;
+      for(const y of rys){
+        const row=[...rmap.get(y)].sort((a,b)=>a.x-b.x);
+        const text=row.map(t=>t.t).join(' ').trim();
+        const hm=text.match(/^(\d+m)\s+(\S+)$/);
+        if(hm && STROKE[deAccent(hm[2])]){ cur=hm[1]+' '+STROKE[deAccent(hm[2])]; continue; }
+        if(/\bLap\b/.test(text)){ cur=null; continue; }      // tabelas de parciais
+        if(!cur || !(cur in EVENTS)) continue;               // estafetas / 5000 / fora de âmbito
+        for(const tk of row){ const s=toSec(tk.t); if(s!=null){ const ev=EVENTS[cur]; (data[ev]||(data[ev]=[])).push(s); break; } }
+      }
+    }
+  }
+  return {data, meta};
+}
+
+/* ---------- estado da UI ---------- */
+const files=[];   // {file, name, gender, year}
+const $=id=>document.getElementById(id);
+
+function refreshFiles(){
+  const wrap=$('filewrap');
+  if(!files.length){ wrap.innerHTML=''; $('run').disabled=true; return; }
+  let h='<table class="files"><thead><tr><th>Ficheiro</th><th>Género</th><th>Época</th><th></th></tr></thead><tbody>';
+  files.forEach((f,i)=>{
+    h+=`<tr>
+      <td class="fname" title="${f.name}">${f.name}</td>
+      <td><select data-i="${i}" data-k="gender">
+        <option value="M"${f.gender==='M'?' selected':''}>Masculino</option>
+        <option value="F"${f.gender==='F'?' selected':''}>Feminino</option></select></td>
+      <td><select data-i="${i}" data-k="year">
+        <option value="2025"${f.year==='2025'?' selected':''}>2025</option>
+        <option value="2026"${f.year==='2026'?' selected':''}>2026</option></select></td>
+      <td><button class="rm" data-rm="${i}" title="Remover">×</button></td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  wrap.innerHTML=h;
+  wrap.querySelectorAll('select').forEach(s=>s.onchange=e=>{files[+e.target.dataset.i][e.target.dataset.k]=e.target.value;});
+  wrap.querySelectorAll('.rm').forEach(b=>b.onclick=e=>{files.splice(+e.target.dataset.rm,1);refreshFiles();});
+  $('run').disabled=false;
+}
+
+function guessFromName(name){
+  const n=deAccent(name);
+  const gender = /\bmas|masc|_m_|men|male\b/.test(n)?'M' : (/\bfem|women|female\b/.test(n)?'F':null);
+  const ym = n.match(/(20\d\d)/);
+  return {gender, year:ym?ym[1]:null};
+}
+
+async function addFiles(list){
+  const msg=$('msg'); msg.className='msg';
+  for(const file of list){
+    if(file.type!=='application/pdf' && !/\.pdf$/i.test(file.name)) continue;
+    const g=guessFromName(file.name);
+    const entry={file, name:file.name, gender:g.gender, year:g.year};
+    files.push(entry);
+    // tenta confirmar pelo cabeçalho do PDF (rápido: só p1)
+    try{
+      const buf=await file.arrayBuffer();
+      const {meta}=await parsePdfMeta(buf.slice(0));
+      if(meta.gender) entry.gender=meta.gender;
+      if(meta.year) entry.year=meta.year;
+      if(meta.label && !$('label').value){
+        $('label').value=meta.label;
+        const c=CODES[deAccent(meta.label)]; if(c && !$('code').value) $('code').value=c;
+      }
+    }catch(e){/* mantém o palpite do nome */}
+    if(!entry.gender) entry.gender='M';
+    if(!entry.year) entry.year='2026';
+    refreshFiles();
+  }
+}
+
+/* leitura rápida só de metadados (página 1) */
+async function parsePdfMeta(buf){
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  const page=await pdf.getPage(1); const tc=await page.getTextContent();
+  const toks=tc.items.flatMap(it=>it.str.trim()?it.str.split(/\s+/).filter(Boolean):[]);
+  const head=toks.slice(0,46).join(' ');
+  const meta={label:null,gender:null,year:null};
+  const pi=toks.indexOf('Piscina'); if(pi>0) meta.label=toks.slice(0,pi).join(' ').trim();
+  if(/\bMasc\b/i.test(head))meta.gender='M'; else if(/\bFemin\b/i.test(head))meta.gender='F';
+  const ym=head.match(/(20\d\d)/); if(ym)meta.year=ym[1];
+  return {meta};
+}
+
+/* ---------- gerar ---------- */
+$('run').onclick=async()=>{
+  const msg=$('msg'); msg.className='msg';
+  const code=$('code').value.trim().toUpperCase();
+  const label=$('label').value.trim();
+  if(!code){ msg.className='msg show err'; msg.textContent='Indique o código de 3 letras do país (ex.: POR).'; return; }
+  if(!label){ msg.className='msg show err'; msg.textContent='Indique a etiqueta do país (ex.: Portugal).'; return; }
+
+  $('run').disabled=true; $('run').textContent='A ler os PDF…';
+  const out={code, label, M:{2025:{},2026:{}}, F:{2025:{},2026:{}}};
+  const seen={};               // género|ano -> usado?
+  const probIfShort=[];
+  try{
+    for(const f of files){
+      const buf=await f.file.arrayBuffer();
+      const {data}=await parsePdf(buf);
+      const slot=out[f.gender][f.year];
+      for(const ev of ORDER){
+        const arr=(data[ev]||[]).map(x=>+x.toFixed(2));
+        slot[ev]=arr.slice(0,6);
+      }
+      seen[f.gender+'|'+f.year]=data;
+    }
+  }catch(err){
+    $('run').disabled=false; $('run').textContent='Gerar código do país';
+    msg.className='msg show err'; msg.textContent='Não consegui ler um dos PDF: '+err.message+'. Confirme que são os ficheiros "Melhores 100" do swimrankings.';
+    return;
+  }
+
+  // saída JSON com indentação de 1 espaço, ordem fixa das chaves
+  const obj={code:out.code,label:out.label};
+  for(const g of ['M','F']){ obj[g]={}; for(const y of ['2025','2026']){ obj[g][y]={}; for(const ev of ORDER) obj[g][y][ev]=out[g][y][ev]||[]; } }
+  $('out').value=JSON.stringify(obj,null,1);
+
+  buildGrids(out, seen);
+  $('verify').style.display=''; $('outstep').style.display='';
+  $('run').disabled=false; $('run').textContent='Gerar código do país';
+
+  const combos=['M|2025','M|2026','F|2025','F|2026'].filter(k=>seen[k]);
+  let short=0; for(const g of['M','F'])for(const y of['2025','2026'])for(const ev of ORDER){const a=(out[g][y][ev]||[]);if(seen[g+'|'+y]&&a.length<6)short++;}
+  msg.className='msg show info';
+  msg.textContent=`Pronto. Lidos ${combos.length}/4 conjuntos (género×época).`+(short?` Atenção: ${short} prova(s) com menos de 6 marcas — veja a verificação.`:` Todas as provas com 6 marcas.`)+(combos.length<4?' Faltam conjuntos: o bloco fica com provas vazias onde não houver PDF.':'');
+  $('outstep').scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+function buildGrids(out, seen){
+  const host=$('grids'); host.innerHTML='';
+  const labels={M:'Masculino',F:'Feminino'};
+  for(const g of ['M','F']) for(const y of ['2025','2026']){
+    if(!seen[g+'|'+y]) continue;
+    const div=document.createElement('div');
+    let h=`<div class="gridhead"><span class="chip">${labels[g]} · ${y}</span></div>
+      <table class="val"><thead><tr><th>Prova</th><th>n</th><th>6 melhores (s)</th></tr></thead><tbody>`;
+    for(const ev of ORDER){
+      const full=(seen[g+'|'+y][ev]||[]);
+      const top=(out[g][y][ev]||[]);
+      const cls = full.length===0?'bad':(top.length<6?'warn':'');
+      h+=`<tr class="${cls}"><td class="ev">${ev}</td><td class="n">${full.length}</td>
+        <td class="times">${top.length?top.map(fmt).join('  ·  '):'sem dados'}</td></tr>`;
+    }
+    h+='</tbody></table>';
+    div.innerHTML=h; host.appendChild(div);
+  }
+}
+
+/* ---------- copiar / descarregar ---------- */
+$('copy').onclick=async()=>{
+  try{ await navigator.clipboard.writeText($('out').value); flash($('copy'),'Copiado ✓'); }
+  catch(e){ $('out').select(); document.execCommand('copy'); flash($('copy'),'Copiado ✓'); }
+};
+function flash(btn,t){const o=btn.textContent;btn.textContent=t;setTimeout(()=>btn.textContent=o,1400);}
+$('download').onclick=()=>{
+  const code=($('code').value.trim().toUpperCase()||'pais');
+  const blob=new Blob([$('out').value],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=code+'_pais.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+
+/* ---------- zona de largar / escolher ---------- */
+const drop=$('drop'), fileInput=$('file');
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=e=>{addFiles([...e.target.files]); fileInput.value='';};
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{addFiles([...e.dataTransfer.files]);});
+</script>
+</body>
+</html>
